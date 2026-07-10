@@ -77,6 +77,12 @@ Training data is ChatML with a shared system prompt; each curated ticket becomes
 | Priority scoring | `priority: <level>` + one-sentence reason | 20% |
 | Reply drafting | full reply, placeholders preserved | 40% |
 
+**A note on DoRA:** the config supports `use_dora=True` and it trains correctly, but on
+bnb-4bit quantized weights DoRA dequantizes the full base weight every forward to compute
+weight norms — measured **~14 min/optimizer-step vs ~1–2 min for plain LoRA** on an RTX
+3060 Ti. The shipped local run therefore uses plain LoRA (`--no-dora`); "free quality
+upgrade" only holds on unquantized or Unsloth-fused setups.
+
 **Priority labels are rule-derived** (`src/tickettriage/priority.py`: base priority per intent,
 bumped one level on urgency language). They're deterministic, documented "silver" labels — the
 eval measures agreement with the policy, and this README won't pretend they're human annotations.

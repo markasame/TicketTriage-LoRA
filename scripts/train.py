@@ -124,7 +124,7 @@ class PadCollator:
         return {k: torch.tensor(v) for k, v in batch.items()}
 
 
-def train(max_steps: int | None, base_model: str, no_dora: bool) -> None:
+def train(max_steps: int | None, base_model: str, no_dora: bool, resume: bool = False) -> None:
     import torch
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
     from transformers import (
@@ -147,8 +147,11 @@ def train(max_steps: int | None, base_model: str, no_dora: bool) -> None:
         bnb_4bit_compute_dtype=torch.bfloat16,
         bnb_4bit_use_double_quant=True,
     )
+    # device_map={"": 0}: everything on GPU 0. "auto" silently dispatches layers to
+    # CPU when the desktop is using VRAM, which bnb-4bit rejects; forcing GPU lets
+    # Windows WDDM page into shared memory instead (slower, but it runs).
     model = AutoModelForCausalLM.from_pretrained(
-        base_model, quantization_config=bnb, device_map="auto"
+        base_model, quantization_config=bnb, device_map={"": 0}
     )
     model = prepare_model_for_kbit_training(model)
     lora_cfg = dict(LORA_CONFIG)
@@ -170,7 +173,14 @@ def train(max_steps: int | None, base_model: str, no_dora: bool) -> None:
         data_collator=PadCollator(tokenizer.pad_token_id or tokenizer.eos_token_id),
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
-    result = trainer.train()
+    ckpt = None
+    if resume:
+        from transformers.trainer_utils import get_last_checkpoint
+
+        ckpt = get_last_checkpoint(OUTPUT_DIR)
+        if ckpt:
+            print(f"resuming from {ckpt}")
+    result = trainer.train(resume_from_checkpoint=ckpt)
 
     trainer.save_model(OUTPUT_DIR)
     tokenizer.save_pretrained(OUTPUT_DIR)
@@ -185,11 +195,12 @@ def main() -> None:
     parser.add_argument("--max-steps", type=int, default=None)
     parser.add_argument("--base-model", default=BASE_MODEL)
     parser.add_argument("--no-dora", action="store_true", help="plain LoRA (lower VRAM)")
+    parser.add_argument("--resume", action="store_true", help="resume from last checkpoint")
     args = parser.parse_args()
     if args.dry_run:
         dry_run()
     else:
-        train(args.max_steps, args.base_model, args.no_dora)
+        train(args.max_steps, args.base_model, args.no_dora, args.resume)
 
 
 if __name__ == "__main__":

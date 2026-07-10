@@ -98,9 +98,14 @@ class OllamaBackend(Backend):
 class TransformersBackend(Backend):
     """HF transformers backend; loads base model in 4-bit, optionally with an adapter."""
 
-    def __init__(self, base_model: str, adapter_path: str | None = None, device_map: str = "auto"):
+    def __init__(self, base_model: str, adapter_path: str | None = None, device_map=None):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+        if device_map is None:
+            # Force GPU 0 when CUDA exists: "auto" dispatches layers to CPU when the
+            # desktop is using VRAM, which bnb-4bit rejects outright.
+            device_map = {"": 0} if torch.cuda.is_available() else "auto"
 
         self.tokenizer = AutoTokenizer.from_pretrained(base_model)
         bnb = BitsAndBytesConfig(
