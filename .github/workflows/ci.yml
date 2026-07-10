@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check src scripts tests app
+      - name: Unit tests (eval harness, data prep, API)
+        run: pytest -q
+      - name: Data-prep smoke test (synthetic, no network)
+        run: |
+          python scripts/prepare_data.py --synthetic --out-dir /tmp/data-smoke
+          test -s /tmp/data-smoke/train.jsonl
+      - name: Training-config smoke test (no GPU, no torch)
+        run: |
+          python scripts/prepare_data.py --synthetic --out-dir data
+          python scripts/train.py --dry-run
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t tickettriage .
+      - name: Smoke-test /health and /triage
+        run: |
+          docker run -d --name svc -p 8000:8000 tickettriage
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8000/health && break || sleep 2
+          done
+          curl -sf -X POST http://localhost:8000/triage \
+            -H "Content-Type: application/json" \
+            -d '{"ticket": "where is my order? I need it urgently"}' | grep -q track_order

@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Data & models (regenerate with scripts/prepare_data.py)
+data/raw/
+models/
+outputs/
+*.gguf
+*.safetensors
+
+# Results are committed selectively (results/eval_report.md is kept)
+results/*.tmp
+
+# Secrets
+.env
+
+# OS
+Thumbs.db
+.DS_Store
