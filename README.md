@@ -1,6 +1,6 @@
 # 🎫 TicketTriage-LoRA
 
-A QLoRA + DoRA fine-tune of **Llama 3.1 8B Instruct** for customer-support ticket triage —
+A QLoRA + DoRA fine-tune of **Qwen3 8B** for customer-support ticket triage —
 intent classification, priority scoring, and reply drafting from a single adapter — with a
 rigorous **before/after evaluation** against the untuned base model.
 
@@ -13,7 +13,7 @@ rigorous **before/after evaluation** against the untuned base model.
 > It writes `results/eval_report.md`; paste the headline table here. The table below shows
 > the metrics that get filled in:
 
-| Metric (216 held-out tickets) | Base Llama 3.1 8B | Fine-tuned |
+| Metric (216 held-out tickets) | Base Qwen3 8B | Fine-tuned |
 |---|---|---|
 | Intent accuracy (27 classes) | *tbd* | *tbd* |
 | Intent macro-F1 | *tbd* | *tbd* |
@@ -24,6 +24,11 @@ rigorous **before/after evaluation** against the untuned base model.
 | MMLU-lite (capability regression check) | *tbd* | *tbd* |
 | Mean latency / ticket | *tbd* | *tbd* |
 | $ / 1k tickets (RTX 4090 @ $0.44/hr) | *tbd* | *tbd* |
+
+**Base model choice:** the brief allowed Llama 3.1 8B Instruct or Qwen3 8B; this run uses
+**Qwen3 8B** (via the prequantized `unsloth/Qwen3-8B-bnb-4bit`) because it is ungated — the
+whole pipeline reproduces without a Hugging Face access request. Swap `--base-model` to use
+Llama 3.1 instead.
 
 ### Why fine-tune instead of just prompting the base model?
 
@@ -48,9 +53,10 @@ say whether a refund was already initiated.
 ```
 scripts/prepare_data.py   Bitext 27k → 1,215 curated examples (dedup, length-filter,
                           class-balanced) + 216 held-out test tickets. Committed in data/.
-scripts/train.py          QLoRA+DoRA via Unsloth (TRL+PEFT fallback): 4-bit NF4, r=16,
-                          α=16, all-linear targets, lr 2e-4, 2 epochs, completions-only
-                          loss, grad checkpointing, early stop on val loss.
+scripts/train.py          QLoRA+DoRA via transformers+PEFT: 4-bit NF4, r=16, α=16,
+                          all-linear targets, lr 2e-4, 2 epochs, completions-only loss
+                          (explicit prompt masking), grad checkpointing, early stop on
+                          val loss. Sized to fit an 8GB GPU; faster on a 4090.
 scripts/run_eval.py       The deliverable that matters: accuracy/F1/confusion for intent,
                           priority accuracy, blind Claude-judge rubric (relevance/tone/
                           correctness), latency + $/ticket, MMLU-lite regression check.
@@ -81,9 +87,10 @@ eval measures agreement with the policy, and this README won't pretend they're h
 # 1. Data (already committed; regenerate with)
 python scripts/prepare_data.py
 
-# 2. Train — needs a ≥12GB GPU. On RunPod (RTX 4090, ~$0.44/hr):
-#    export HF_TOKEN=... ANTHROPIC_API_KEY=...
-bash scripts/runpod_run.sh          # data + train + eval + GGUF, < $2
+# 2. Train — fits an 8GB GPU (batch 1 × grad-accum 16); or on RunPod
+#    (RTX 4090, ~$0.44/hr, < $2 total; ANTHROPIC_API_KEY enables the judge):
+bash scripts/runpod_run.sh          # data + train + eval + GGUF
+# locally: python scripts/train.py
 
 # 3. Serve locally
 ollama create tickettriage -f models/gguf/Modelfile

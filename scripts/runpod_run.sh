@@ -3,8 +3,8 @@
 # Total cost at $0.44/hr: data prep + training + eval + export typically < $2.
 #
 # Prereqs (set in the pod):
-#   export HF_TOKEN=hf_...            # gated Llama 3.1 access
-#   export ANTHROPIC_API_KEY=sk-...   # for the LLM judge (optional: --skip-judge)
+#   export ANTHROPIC_API_KEY=sk-...   # for the LLM judge (skipped if unset)
+# Base model is Qwen3-8B (ungated) — no HF token required.
 #
 # Usage: bash scripts/runpod_run.sh
 set -euo pipefail
@@ -12,8 +12,7 @@ cd "$(dirname "$0")/.."
 
 echo "=== 1/5 environment ==="
 pip install -q -e ".[eval]"
-pip install -q "unsloth" "trl>=0.12" "peft>=0.13" "datasets" "bitsandbytes" || \
-  pip install -q "trl>=0.12" "peft>=0.13" "datasets" "bitsandbytes" accelerate
+pip install -q "transformers>=4.45" "peft>=0.13" "bitsandbytes>=0.44" accelerate
 python -c "import torch; assert torch.cuda.is_available(), 'no GPU'; print(torch.cuda.get_device_name(0))"
 
 echo "=== 2/5 data ==="
@@ -24,9 +23,9 @@ python scripts/train.py
 
 echo "=== 4/5 eval (base vs fine-tuned) ==="
 python scripts/run_eval.py \
-  --base "hf:meta-llama/Llama-3.1-8B-Instruct" \
-  --finetuned "hf:meta-llama/Llama-3.1-8B-Instruct@models/tickettriage-lora" \
-  ${ANTHROPIC_API_KEY:+} $( [ -z "${ANTHROPIC_API_KEY:-}" ] && echo --skip-judge )
+  --base "hf:unsloth/Qwen3-8B-bnb-4bit" \
+  --finetuned "hf:unsloth/Qwen3-8B-bnb-4bit@models/tickettriage-lora" \
+  $( [ -z "${ANTHROPIC_API_KEY:-}" ] && echo --skip-judge )
 
 echo "=== 5/5 export GGUF ==="
 if [ ! -d llama.cpp ]; then

@@ -1,7 +1,7 @@
 """FastAPI service exposing POST /triage.
 
 Backend is chosen with the TRIAGE_BACKEND env var (see inference.make_backend),
-e.g. TRIAGE_BACKEND="ollama:tickettriage" or "hf:meta-llama/Llama-3.1-8B-Instruct@models/adapter".
+e.g. TRIAGE_BACKEND="ollama:tickettriage" or "hf:unsloth/Qwen3-8B-bnb-4bit@models/adapter".
 Defaults to the echo backend so the service starts without a model (useful in CI).
 """
 

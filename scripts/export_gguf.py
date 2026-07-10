@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-BASE_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+BASE_MODEL = "Qwen/Qwen3-8B"  # fp16 base for merging (adapter was trained on its NF4 quant)
 
 _SYSTEM = (
     "You are TicketTriage, an assistant for a customer support team. "

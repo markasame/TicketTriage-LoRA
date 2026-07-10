@@ -12,7 +12,7 @@ license: mit
 
 # TicketTriage-LoRA demo
 
-Side-by-side comparison of base Llama 3.1 8B Instruct vs a QLoRA+DoRA fine-tune
+Side-by-side comparison of base Qwen3 8B vs a QLoRA+DoRA fine-tune
 for support-ticket triage (intent, priority, draft reply), with eval scores on
 the page.
 

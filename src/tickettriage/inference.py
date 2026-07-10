@@ -33,6 +33,9 @@ class Backend:
     def generate(self, user_prompt: str, max_new_tokens: int = 400) -> str:
         raise NotImplementedError
 
+    def close(self) -> None:
+        """Release resources (GPU memory for local backends)."""
+
     def triage(self, ticket: str) -> TriageResult:
         start = time.perf_counter()
         intent_raw = self.generate(classify_prompt(ticket), max_new_tokens=20)
@@ -125,7 +128,10 @@ class TransformersBackend(Backend):
             {"role": "user", "content": user_prompt},
         ]
         inputs = self.tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, return_tensors="pt"
+            messages,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            enable_thinking=False,  # Qwen3: non-thinking mode; ignored by other templates
         ).to(self.model.device)
         with torch.no_grad():
             out = self.model.generate(
@@ -137,6 +143,15 @@ class TransformersBackend(Backend):
                 pad_token_id=self.tokenizer.eos_token_id,
             )
         return self.tokenizer.decode(out[0][inputs.shape[1]:], skip_special_tokens=True)
+
+    def close(self) -> None:
+        import gc
+
+        import torch
+
+        del self.model
+        gc.collect()
+        torch.cuda.empty_cache()
 
 
 def make_backend(spec: str) -> Backend:

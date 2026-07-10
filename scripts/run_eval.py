@@ -9,8 +9,8 @@ Produces results/eval_results.json and results/eval_report.md covering:
 
 Usage (on the GPU box after training):
   python scripts/run_eval.py \
-      --base hf:meta-llama/Llama-3.1-8B-Instruct \
-      --finetuned hf:meta-llama/Llama-3.1-8B-Instruct@models/tickettriage-lora
+      --base hf:unsloth/Qwen3-8B-bnb-4bit \
+      --finetuned hf:unsloth/Qwen3-8B-bnb-4bit@models/tickettriage-lora
 
 Any backend spec from tickettriage.inference works (echo / ollama:… / hf:…).
 Use --limit and --skip-judge for quick partial runs.
@@ -62,6 +62,7 @@ def eval_model(spec: str, test_rows: list[dict], gpu_rate: float, skip_capabilit
     if not skip_capability:
         print("  running MMLU-lite capability check...")
         out["capability"] = run_capability_check(backend)
+    backend.close()  # free GPU memory before the second model loads
     return out
 
 

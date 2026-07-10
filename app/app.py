@@ -121,7 +121,7 @@ def build_app() -> gr.Blocks:
 
     with gr.Blocks(title="TicketTriage-LoRA") as demo:
         gr.Markdown("# 🎫 TicketTriage-LoRA\n"
-                    "QLoRA+DoRA fine-tune of Llama 3.1 8B for support-ticket triage — "
+                    "QLoRA+DoRA fine-tune of Qwen3 8B for support-ticket triage — "
                     "side-by-side with the untuned base model.")
         gr.Markdown(scores_markdown(results))
         mode = "live inference" if live else "showcase (precomputed eval outputs)"
