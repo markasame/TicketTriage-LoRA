@@ -42,6 +42,7 @@ TRAIN_CONFIG = dict(
     lr_scheduler_type="cosine",
     warmup_ratio=0.03,
     per_device_train_batch_size=1,
+    per_device_eval_batch_size=2,  # default 8 spikes VRAM on 8GB cards
     gradient_accumulation_steps=16,
     gradient_checkpointing=True,
     gradient_checkpointing_kwargs={"use_reentrant": False},

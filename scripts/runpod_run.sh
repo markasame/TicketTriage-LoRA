@@ -25,7 +25,7 @@ echo "=== 4/5 eval (base vs fine-tuned) ==="
 python scripts/run_eval.py \
   --base "hf:unsloth/Qwen3-8B-bnb-4bit" \
   --finetuned "hf:unsloth/Qwen3-8B-bnb-4bit@models/tickettriage-lora" \
-  $( [ -z "${ANTHROPIC_API_KEY:-}" ] && echo --skip-judge )
+  $( [ -n "${ANTHROPIC_API_KEY:-}" ] && echo --judge )
 
 echo "=== 5/5 export GGUF ==="
 if [ ! -d llama.cpp ]; then

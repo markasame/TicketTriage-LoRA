@@ -1,9 +1,11 @@
 """Before/after evaluation: base model vs fine-tuned adapter on the held-out test set.
 
-Produces results/eval_results.json and results/eval_report.md covering:
+100% free by default — no API keys. Produces results/eval_results.json and
+results/eval_report.md covering:
   - intent classification: accuracy, per-class F1, confusion matrix
   - priority scoring: accuracy vs rule-derived labels
-  - reply quality: blind Claude-judge rubric scores (needs ANTHROPIC_API_KEY)
+  - reply quality: free reference-based metrics (ROUGE-L, token-F1,
+    placeholder fidelity); an LLM judge is available behind opt-in --judge
   - latency + $ per ticket
   - MMLU-lite general-capability spot check
 
@@ -29,6 +31,7 @@ from tickettriage.eval.capability import run_capability_check  # noqa: E402
 from tickettriage.eval.classification import evaluate_classification  # noqa: E402
 from tickettriage.eval.costs import DEFAULT_GPU_USD_PER_HOUR, cost_summary  # noqa: E402
 from tickettriage.eval.judge import judge_batch, summarize_scores  # noqa: E402
+from tickettriage.eval.reply_metrics import score_replies  # noqa: E402
 from tickettriage.eval.report import render_report  # noqa: E402
 from tickettriage.inference import make_backend  # noqa: E402
 
@@ -55,10 +58,11 @@ def eval_model(spec: str, test_rows: list[dict], gpu_rate: float, skip_capabilit
         "priority": {"accuracy": priority.accuracy, "macro_f1": priority.macro_f1},
         "cost": cost_summary([p.latency_s for p in predictions], gpu_rate),
         "replies": [
-            {"ticket": r["ticket"], "reply": p.draft_reply}
+            {"ticket": r["ticket"], "reply": p.draft_reply, "reference_reply": r["reference_reply"]}
             for r, p in zip(test_rows, predictions)
         ],
     }
+    out["reply_metrics"] = score_replies(out["replies"])
     if not skip_capability:
         print("  running MMLU-lite capability check...")
         out["capability"] = run_capability_check(backend)
@@ -84,7 +88,12 @@ def main() -> None:
     parser.add_argument("--finetuned", required=True, help="backend spec for the tuned model")
     parser.add_argument("--test-file", default="data/test.jsonl")
     parser.add_argument("--limit", type=int, default=None, help="evaluate only the first N tickets")
-    parser.add_argument("--skip-judge", action="store_true")
+    parser.add_argument(
+        "--judge", action="store_true",
+        help="also run the optional paid LLM judge (needs ANTHROPIC_API_KEY); "
+        "reply quality is otherwise measured with free reference-based metrics",
+    )
+    parser.add_argument("--skip-judge", action="store_true", help="deprecated no-op (judge is opt-in)")
     parser.add_argument("--skip-capability", action="store_true")
     parser.add_argument("--gpu-usd-per-hour", type=float, default=DEFAULT_GPU_USD_PER_HOUR)
     parser.add_argument("--out-dir", default="results")
@@ -106,7 +115,7 @@ def main() -> None:
             args.finetuned, test_rows, args.gpu_usd_per_hour, args.skip_capability
         ),
     }
-    if not args.skip_judge:
+    if args.judge:
         run_judge(results)
 
     out = Path(args.out_dir)

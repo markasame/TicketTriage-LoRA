@@ -26,6 +26,13 @@ def render_report(results: dict) -> str:
         f"| Intent macro-F1 | {base['classification']['macro_f1']:.3f} | {ft['classification']['macro_f1']:.3f} |",
         f"| Priority accuracy | {_pct(base['priority']['accuracy'])} | {_pct(ft['priority']['accuracy'])} |",
     ]
+    if base.get("reply_metrics", {}).get("n"):
+        brm, frm = base["reply_metrics"], ft["reply_metrics"]
+        lines += [
+            f"| Reply ROUGE-L vs reference | {brm['rouge_l']:.3f} | {frm['rouge_l']:.3f} |",
+            f"| Reply token-F1 vs reference | {brm['token_f1']:.3f} | {frm['token_f1']:.3f} |",
+            f"| Placeholder fidelity | {_pct(brm['placeholder_fidelity'])} | {_pct(frm['placeholder_fidelity'])} |",
+        ]
     if base.get("judge", {}).get("n"):
         lines += [
             f"| Reply relevance (judge, 1-5) | {base['judge']['relevance']} | {ft['judge']['relevance']} |",
@@ -74,8 +81,10 @@ def render_report(results: dict) -> str:
         "",
         "- Priority ground truth is rule-derived (see `src/tickettriage/priority.py`), "
         "not human-annotated; priority accuracy measures agreement with those rules.",
-        "- Judge: Claude (`claude-opus-4-8`) with a fixed anchored rubric; the judge never "
-        "sees which model wrote a reply.",
+        "- Reply metrics are free reference-based scores (ROUGE-L / token-F1 against the "
+        "dataset's reference reply, placeholder fidelity). Similarity to a single reference "
+        "is a blunt instrument, but a fair relative signal between two models on the same "
+        "tickets. The optional LLM judge (--judge) was not used unless judge rows appear above.",
         "- MMLU-lite is a 24-question smoke check for gross capability regressions, "
         "not a full benchmark.",
         "",

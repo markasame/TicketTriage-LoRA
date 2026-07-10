@@ -46,6 +46,15 @@ def scores_markdown(results: dict | None) -> str:
         f"| Priority accuracy | {base['priority']['accuracy']:.1%} "
         f"| **{ft['priority']['accuracy']:.1%}** |",
     ]
+    if base.get("reply_metrics", {}).get("n"):
+        rows.append(
+            f"| Reply ROUGE-L vs reference | {base['reply_metrics']['rouge_l']:.3f} "
+            f"| **{ft['reply_metrics']['rouge_l']:.3f}** |"
+        )
+        rows.append(
+            f"| Placeholder fidelity | {base['reply_metrics']['placeholder_fidelity']:.1%} "
+            f"| **{ft['reply_metrics']['placeholder_fidelity']:.1%}** |"
+        )
     if base.get("judge", {}).get("n"):
         rows.append(
             f"| Reply quality (judge mean, 1-5) | {base['judge']['mean']} "
@@ -56,8 +65,8 @@ def scores_markdown(results: dict | None) -> str:
             f"| MMLU-lite | {base['capability']['accuracy']:.1%} "
             f"| {ft['capability']['accuracy']:.1%} |"
         )
-    rows.append(f"\n*Evaluated on {results['n_test']} held-out tickets. "
-                f"Judge: Claude with a fixed rubric, blind to model identity.*")
+    rows.append(f"\n*Evaluated on {results['n_test']} held-out tickets with free "
+                f"reference-based metrics — no paid APIs anywhere in this project.*")
     return "\n".join(rows)
 
 

@@ -8,19 +8,20 @@ rigorous **before/after evaluation** against the untuned base model.
 
 ## Results
 
-> ⚠️ **Pending first training run.** The full pipeline (data → train → eval → export) runs
-> unattended with `bash scripts/runpod_run.sh` on a RunPod RTX 4090 (~$0.44/hr, < $2 total).
-> It writes `results/eval_report.md`; paste the headline table here. The table below shows
-> the metrics that get filled in:
+> ⚠️ **Pending first training run.** The whole project is **100% free to reproduce** — no
+> paid APIs, no gated models. Training + eval run unattended on any ≥8GB consumer GPU
+> (`python scripts/train.py` then `scripts/run_eval.py`; on a busy Windows desktop,
+> `scripts/local_supervisor.ps1` waits for free VRAM and drives both). The run writes
+> `results/eval_report.md`; paste the headline table here:
 
 | Metric (216 held-out tickets) | Base Qwen3 8B | Fine-tuned |
 |---|---|---|
 | Intent accuracy (27 classes) | *tbd* | *tbd* |
 | Intent macro-F1 | *tbd* | *tbd* |
 | Priority accuracy | *tbd* | *tbd* |
-| Reply relevance (LLM judge, 1–5) | *tbd* | *tbd* |
-| Reply tone (LLM judge, 1–5) | *tbd* | *tbd* |
-| Reply correctness (LLM judge, 1–5) | *tbd* | *tbd* |
+| Reply ROUGE-L vs reference | *tbd* | *tbd* |
+| Reply token-F1 vs reference | *tbd* | *tbd* |
+| Placeholder fidelity | *tbd* | *tbd* |
 | MMLU-lite (capability regression check) | *tbd* | *tbd* |
 | Mean latency / ticket | *tbd* | *tbd* |
 | $ / 1k tickets (RTX 4090 @ $0.44/hr) | *tbd* | *tbd* |
@@ -58,8 +59,9 @@ scripts/train.py          QLoRA+DoRA via transformers+PEFT: 4-bit NF4, r=16, α=
                           (explicit prompt masking), grad checkpointing, early stop on
                           val loss. Sized to fit an 8GB GPU; faster on a 4090.
 scripts/run_eval.py       The deliverable that matters: accuracy/F1/confusion for intent,
-                          priority accuracy, blind Claude-judge rubric (relevance/tone/
-                          correctness), latency + $/ticket, MMLU-lite regression check.
+                          priority accuracy, free reference-based reply metrics (ROUGE-L,
+                          token-F1, placeholder fidelity; optional --judge LLM rubric),
+                          latency + $/ticket, MMLU-lite regression check.
 scripts/export_gguf.py    Merge adapter → GGUF q4_k_m → Ollama Modelfile.
 scripts/runpod_run.sh     All of the above as one unattended pipeline.
 src/tickettriage/         Prompts, priority policy, inference backends, FastAPI service.
@@ -93,10 +95,12 @@ eval measures agreement with the policy, and this README won't pretend they're h
 # 1. Data (already committed; regenerate with)
 python scripts/prepare_data.py
 
-# 2. Train — fits an 8GB GPU (batch 1 × grad-accum 16); or on RunPod
-#    (RTX 4090, ~$0.44/hr, < $2 total; ANTHROPIC_API_KEY enables the judge):
-bash scripts/runpod_run.sh          # data + train + eval + GGUF
-# locally: python scripts/train.py
+# 2. Train — free, fits an 8GB GPU (batch 1 × grad-accum 16)
+python scripts/train.py --no-dora
+python scripts/run_eval.py --base "hf:unsloth/Qwen3-8B-bnb-4bit" \
+    --finetuned "hf:unsloth/Qwen3-8B-bnb-4bit@models/tickettriage-lora"
+# busy Windows desktop? scripts/local_supervisor.ps1 waits for VRAM and runs both
+# rented GPU instead: bash scripts/runpod_run.sh (optional, ~$2 on an RTX 4090)
 
 # 3. Serve locally
 ollama create tickettriage -f models/gguf/Modelfile
@@ -113,19 +117,25 @@ python scripts/deploy_space.py --space <you>/tickettriage-lora
 
 - **Held-out test set**: 216 tickets (8 per intent) split off *before* training-example
   construction; a test assertion guards against leakage.
-- **LLM judge**: Claude `claude-opus-4-8` with a fixed, anchored 1–5 rubric via structured
-  outputs (Pydantic-validated). The judge scores each reply independently and never knows
-  which model wrote it; `{{placeholders}}` are explicitly defined as correct so the judge
-  doesn't penalize the intended format.
+- **Reply quality (free, default)**: ROUGE-L and token-F1 against the dataset's reference
+  reply, plus placeholder fidelity (does the reply keep `{{Order Number}}`-style slots
+  instead of inventing concrete details?). Similarity to a single reference is a blunt
+  instrument — a good reply worded differently scores lower than a mediocre parrot — but
+  it is deterministic, costs nothing, and is a fair *relative* signal between two models
+  on identical tickets.
+- **LLM judge (optional, off by default)**: `scripts/run_eval.py --judge` adds a blind
+  Claude judge with a fixed anchored 1–5 rubric via structured outputs. It needs a paid
+  API key, so it is never required and no number in this README depends on it.
 - **Cost**: both models are 8B on identical hardware, so $/ticket = latency × GPU rate.
 - **MMLU-lite**: 24 bundled multiple-choice questions — a smoke alarm for gross capability
   regressions (format collapse, catastrophic forgetting), not a benchmark.
 
 ## CI
 
-Lint (ruff) → unit tests (40, covering the eval harness, priority policy, data prep,
+Lint (ruff) → unit tests (covering the eval harness, priority policy, data prep,
 API) → offline data-prep + training-config smoke tests → Docker build + `/triage`
-smoke test. Full training never runs in CI.
+smoke test. Full training never runs in CI. All infra is free-tier: GitHub Actions
+(public repo), HF Spaces (CPU showcase mode), local GPU training.
 
 ## Dataset & license
 
