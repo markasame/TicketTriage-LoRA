@@ -136,18 +136,20 @@ class TransformersBackend(Backend):
             messages,
             add_generation_prompt=True,
             return_tensors="pt",
+            return_dict=True,  # explicit: newer transformers returns BatchEncoding anyway
             enable_thinking=False,  # Qwen3: non-thinking mode; ignored by other templates
         ).to(self.model.device)
         with torch.no_grad():
             out = self.model.generate(
-                inputs,
+                **inputs,
                 max_new_tokens=max_new_tokens,
                 do_sample=False,
                 temperature=None,
                 top_p=None,
                 pad_token_id=self.tokenizer.eos_token_id,
             )
-        return self.tokenizer.decode(out[0][inputs.shape[1]:], skip_special_tokens=True)
+        prompt_len = inputs["input_ids"].shape[1]
+        return self.tokenizer.decode(out[0][prompt_len:], skip_special_tokens=True)
 
     def close(self) -> None:
         import gc

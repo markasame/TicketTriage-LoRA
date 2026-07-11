@@ -41,8 +41,8 @@ $evalDone = "results\eval_results.json"
 $attempt = 0
 while (-not (Test-Path $evalDone) -and $attempt -lt 20) {
     $attempt++
-    WaitVram 6800
-    Log "eval attempt $attempt (base vs fine-tuned, judge skipped: no API key)"
+    WaitVram 5200   # generation tolerates WDDM paging; training did not
+    Log "eval attempt $attempt (base vs fine-tuned, free metrics only)"
     & $py -u scripts\run_eval.py `
         --base "hf:unsloth/Qwen3-8B-bnb-4bit" `
         --finetuned "hf:unsloth/Qwen3-8B-bnb-4bit@models/tickettriage-lora" `
