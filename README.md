@@ -4,7 +4,9 @@ A QLoRA + DoRA fine-tune of **Qwen3 8B** for customer-support ticket triage —
 intent classification, priority scoring, and reply drafting from a single adapter — with a
 rigorous **before/after evaluation** against the untuned base model.
 
-**[▶ Live demo on HF Spaces](https://huggingface.co/spaces/CHANGEME/tickettriage-lora)** · *(demo GIF goes here after the first training run)*
+**[▶ Live demo on HF Spaces](https://huggingface.co/spaces/markasame/tickettriage-lora)** —
+a free static showcase serving the *actual* eval outputs side by side (HF now paywalls
+Gradio Spaces behind PRO; the Gradio app in `app/` still runs locally, including live mode).
 
 ## Results
 

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TicketTriage-LoRA — base vs fine-tuned</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1a1d23; --muted: #5c6470;
+    --border: #e2e5ea; --accent: #4f46e5; --accent-soft: #eef2ff;
+    --win: #067647; --win-bg: #ecfdf3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101318; --card: #181c23; --text: #e8eaee; --muted: #9aa3af;
+      --border: #2a303a; --accent: #818cf8; --accent-soft: #23263a;
+      --win: #4ade80; --win-bg: #12291b;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 2rem 1rem 4rem;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.7rem; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); margin: 0.4rem 0 1.6rem; max-width: 46rem; }
+  .sub a { color: var(--accent); }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.1rem 1.3rem; margin-bottom: 1.2rem;
+  }
+  h2 { font-size: 1.05rem; margin-bottom: 0.7rem; }
+  .note { color: var(--muted); font-size: 0.85rem; margin-top: 0.6rem; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.42rem 0.9rem 0.42rem 0; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  th { color: var(--muted); font-weight: 600; }
+  td.ft { font-weight: 650; }
+  td.better { color: var(--win); }
+  textarea {
+    width: 100%; min-height: 5.2rem; resize: vertical;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.7rem 0.8rem; font: inherit; font-size: 0.95rem;
+  }
+  textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button {
+    margin-top: 0.7rem; background: var(--accent); color: #fff; border: none;
+    border-radius: 8px; padding: 0.55rem 1.4rem; font: inherit; font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.9rem; }
+  .chip {
+    background: var(--accent-soft); color: var(--accent); border: none;
+    border-radius: 999px; padding: 0.28rem 0.8rem; font-size: 0.8rem;
+    margin: 0; font-weight: 500; cursor: pointer; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .matched { font-size: 0.85rem; color: var(--muted); margin: 0.9rem 0 0.6rem; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+  .col h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.45rem; }
+  .col.winner h3 { color: var(--win); }
+  .reply {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.75rem 0.85rem; font-size: 0.9rem; white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .col.winner .reply { background: var(--win-bg); }
+  details { margin-top: 0.9rem; }
+  summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+  details .reply { margin-top: 0.5rem; }
+  .hidden { display: none; }
+  footer { color: var(--muted); font-size: 0.82rem; margin-top: 2rem; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎫 TicketTriage-LoRA</h1>
+  <p class="sub">
+    A QLoRA fine-tune of <strong>Qwen3&nbsp;8B</strong> for customer-support ticket triage,
+    compared side by side with the untuned base model on the same prompts.
+    Everything below comes from the real evaluation on <span id="ntest">216</span> held-out
+    tickets — <a href="https://github.com/markasame/TicketTriage-LoRA">code &amp; full report on GitHub</a>.
+  </p>
+
+  <div class="card">
+    <h2>Eval scores (base vs fine-tuned)</h2>
+    <div class="tablewrap"><table id="scores"><tbody></tbody></table></div>
+    <p class="note">Free reference-based metrics — no paid APIs anywhere in this project.
+    MMLU-lite is a capability-regression smoke check: unchanged is the desired result.</p>
+  </div>
+
+  <div class="card">
+    <h2>Try it — showcase mode</h2>
+    <p class="note" style="margin:0 0 0.7rem">
+      This free static page can't run an 8B model, so it serves <em>precomputed</em> outputs:
+      type anything and it shows the closest real held-out test ticket with what each model
+      actually replied during the eval.
+    </p>
+    <textarea id="ticket" placeholder="Paste a customer message… e.g. “I was charged twice and nobody answers the phone!”"></textarea>
+    <button id="go">Triage</button>
+    <div class="chips" id="examples"></div>
+    <div id="result" class="hidden">
+      <p class="matched" id="matched"></p>
+      <div class="cols">
+        <div class="col"><h3>Base Qwen3 8B</h3><div class="reply" id="base"></div></div>
+        <div class="col winner"><h3>Fine-tuned (LoRA)</h3><div class="reply" id="ft"></div></div>
+      </div>
+      <details><summary>Dataset reference reply for this ticket</summary>
+        <div class="reply" id="ref"></div></details>
+    </div>
+  </div>
+
+  <footer>
+    Adapter trained with QLoRA (4-bit NF4, r=16) on an 8&nbsp;GB consumer GPU ·
+    data derived from the Bitext customer-support dataset (CDLA-Sharing-1.0) ·
+    code MIT · <a href="https://github.com/markasame/TicketTriage-LoRA">github.com/markasame/TicketTriage-LoRA</a>
+  </footer>
+</div>
+
+<script>
+(async function () {
+  const data = await (await fetch("eval_results.json")).json();
+  const base = data.base, ft = data.finetuned;
+  document.getElementById("ntest").textContent = data.n_test;
+
+  const pct = (x) => (x * 100).toFixed(1) + "%";
+  const rows = [
+    ["Intent accuracy (27 classes)", pct(base.classification.accuracy), pct(ft.classification.accuracy), true],
+    ["Intent macro-F1", base.classification.macro_f1.toFixed(3), ft.classification.macro_f1.toFixed(3), true],
+    ["Priority accuracy", pct(base.priority.accuracy), pct(ft.priority.accuracy), true],
+    ["Reply ROUGE-L vs reference", base.reply_metrics.rouge_l.toFixed(3), ft.reply_metrics.rouge_l.toFixed(3), true],
+    ["Reply token-F1 vs reference", base.reply_metrics.token_f1.toFixed(3), ft.reply_metrics.token_f1.toFixed(3), true],
+    ["Placeholder fidelity", pct(base.reply_metrics.placeholder_fidelity), pct(ft.reply_metrics.placeholder_fidelity), true],
+    ["MMLU-lite (capability check)", pct(base.capability.accuracy), pct(ft.capability.accuracy), false],
+    ["Mean latency / ticket", base.cost.mean_latency_s.toFixed(2) + "s", ft.cost.mean_latency_s.toFixed(2) + "s", false],
+  ];
+  const tbody = document.querySelector("#scores tbody");
+  tbody.innerHTML = "<tr><th>Metric</th><th>Base</th><th>Fine-tuned</th></tr>" +
+    rows.map(([m, b, f, win]) =>
+      `<tr><td>${m}</td><td>${b}</td><td class="ft${win ? " better" : ""}">${f}</td></tr>`).join("");
+
+  // showcase pairs: same ticket present in both models' reply lists
+  const baseByTicket = Object.fromEntries(base.replies.map(r => [r.ticket, r]));
+  const pairs = ft.replies.filter(r => baseByTicket[r.ticket]).map(r => ({
+    ticket: r.ticket, ft: r.reply, base: baseByTicket[r.ticket].reply,
+    ref: r.reference_reply || baseByTicket[r.ticket].reference_reply || "",
+  }));
+
+  const tokens = (s) => new Set(s.toLowerCase().split(/\W+/).filter(Boolean));
+  function closest(text) {
+    const q = tokens(text);
+    let best = pairs[0], bestScore = -1;
+    for (const p of pairs) {
+      let score = 0;
+      for (const w of tokens(p.ticket)) if (q.has(w)) score++;
+      if (score > bestScore) { bestScore = score; best = p; }
+    }
+    return best;
+  }
+
+  function show(pair, exact) {
+    document.getElementById("matched").textContent = (exact
+      ? "Held-out test ticket: " : "Closest held-out test ticket: ") + "“" + pair.ticket + "”";
+    document.getElementById("base").textContent = pair.base;
+    document.getElementById("ft").textContent = pair.ft;
+    document.getElementById("ref").textContent = pair.ref;
+    document.getElementById("result").classList.remove("hidden");
+  }
+
+  function run() {
+    const text = document.getElementById("ticket").value.trim();
+    if (!text) return;
+    const exact = pairs.find(p => p.ticket === text);
+    show(exact || closest(text), Boolean(exact));
+  }
+  document.getElementById("go").addEventListener("click", run);
+  document.getElementById("ticket").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) run();
+  });
+
+  const chips = document.getElementById("examples");
+  for (const p of pairs.slice(0, 6)) {
+    const b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.textContent = p.ticket;
+    b.addEventListener("click", () => { document.getElementById("ticket").value = p.ticket; show(p, true); });
+    chips.appendChild(b);
+  }
+})();
+</script>
+</body>
+</html>
