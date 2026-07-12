@@ -8,23 +8,27 @@ rigorous **before/after evaluation** against the untuned base model.
 
 ## Results
 
-> ⚠️ **Pending first training run.** The whole project is **100% free to reproduce** — no
-> paid APIs, no gated models. Training + eval run unattended on any ≥8GB consumer GPU
-> (`python scripts/train.py` then `scripts/run_eval.py`; on a busy Windows desktop,
-> `scripts/local_supervisor.ps1` waits for free VRAM and drives both). The run writes
-> `results/eval_report.md`; paste the headline table here:
+Numbers from `results/eval_report.md`, produced by a real run on an RTX 3060 Ti (8GB) —
+plain LoRA (`--no-dora`), free metrics only, no API keys. The whole project is **100% free
+to reproduce** — no paid APIs, no gated models. Training + eval run unattended on any ≥8GB
+consumer GPU (`python scripts/train.py` then `scripts/run_eval.py`; on a busy Windows
+desktop, `scripts/local_supervisor.ps1` waits for free VRAM and drives both).
 
 | Metric (216 held-out tickets) | Base Qwen3 8B | Fine-tuned |
 |---|---|---|
-| Intent accuracy (27 classes) | *tbd* | *tbd* |
-| Intent macro-F1 | *tbd* | *tbd* |
-| Priority accuracy | *tbd* | *tbd* |
-| Reply ROUGE-L vs reference | *tbd* | *tbd* |
-| Reply token-F1 vs reference | *tbd* | *tbd* |
-| Placeholder fidelity | *tbd* | *tbd* |
-| MMLU-lite (capability regression check) | *tbd* | *tbd* |
-| Mean latency / ticket | *tbd* | *tbd* |
-| $ / 1k tickets (RTX 4090 @ $0.44/hr) | *tbd* | *tbd* |
+| Intent accuracy (27 classes) | 80.1% | **96.3%** |
+| Intent macro-F1 | 0.782 | **0.963** |
+| Priority accuracy | 37.5% | **63.9%** |
+| Reply ROUGE-L vs reference | 0.230 | **0.352** |
+| Reply token-F1 vs reference | 0.395 | **0.502** |
+| Placeholder fidelity | 60.2% | **85.2%** |
+| MMLU-lite (capability regression check) | 91.7% | 91.7% |
+| Mean latency / ticket | 12.19s | 14.44s |
+| $ / 1k tickets (RTX 4090 @ $0.44/hr) | $1.49 | $1.77 |
+
+The fine-tune wins every task metric while MMLU-lite stays flat — the adapter changed
+*behavior*, not general capability. Latency was measured on the shared 8GB desktop GPU
+(WDDM paging included), so treat it as an upper bound.
 
 **Base model choice:** the brief allowed Llama 3.1 8B Instruct or Qwen3 8B; this run uses
 **Qwen3 8B** (via the prequantized `unsloth/Qwen3-8B-bnb-4bit`) because it is ungated — the
@@ -43,11 +47,17 @@ identical for both models in the eval.
 
 ### An honest failure case
 
-*Fill in from `results/eval_report.md` → "Weakest intent classes" + "Confusion pairs" after
-the run.* Expected from the label space: `track_refund` vs `get_refund` — tickets like
-*"I still haven't gotten my money back"* sit exactly on the boundary between *asking where a
-refund is* and *requesting one*, and the model picks the wrong side when the ticket doesn't
-say whether a refund was already initiated.
+The fine-tuned model's remaining errors cluster where the label space genuinely overlaps
+(`results/eval_report.md`, confusion pairs): the top confusion is **`track_refund` →
+`check_refund_policy`** (2 of 8 test tickets) — a customer asking *where their money is*
+gets read as asking *what the refund rules are* when the ticket doesn't say a refund was
+already initiated. Same story for **`set_up_shipping_address` → `change_shipping_address`**
+(2×): whether an address edit is a "set up" or a "change" depends on account state the
+ticket text simply doesn't contain. Weakest classes by F1: `check_refund_policy` (0.84),
+`set_up_shipping_address` (0.86), `track_refund` (0.86) — versus a 0.963 macro average.
+Priority accuracy (63.9%) is the weakest headline number: the target is a two-part
+rule (intent base priority + urgency-language bump), and the model under-applies the
+bump on tickets whose urgency is implied rather than stated.
 
 ## What's in the box
 
